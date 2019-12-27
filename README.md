@@ -44,3 +44,5 @@ we have that this quadratic approximation reaches its minimum when
 which is satisfied when the displacement <ins>&delta;</ins> solves the following linear system:
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=(J^{(0)}^T&space;\cdot&space;J^{(0)})&space;\cdot&space;\underline{\delta}&space;=&space;J^{(0)}&space;\cdot&space;\underline{\epsilon}^{(0)}" target="_blank"><img src="https://latex.codecogs.com/gif.latex?(J^{(0)}^T&space;\cdot&space;J^{(0)})&space;\cdot&space;\underline{\delta}&space;=&space;J^{(0)}&space;\cdot&space;\underline{\epsilon}^{(0)}" title="(J^{(0)}^T \cdot J^{(0)}) \cdot \underline{\delta} = J^{(0)} \cdot \underline{\epsilon}^{(0)}" /></a>
+
+![alt-text](https://github.com/flowel1/nonlinear-regression/blob/master/pictures/quadratic-approx.png)
