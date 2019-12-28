@@ -4,21 +4,30 @@ import collections
 import numpy as np
 import sys
 
-from enum import Enum
-
 # y = f(X, theta) + eps
 
-class PDistr(Enum):
-    GAUSSIAN  = 1
-    LOGNORMAL = 2
-    
 class Prior:
     
-    def __init__(self, distrib, mean = 0., precision = 1.):
+    GAUSSIAN  = 'GAUSSIAN'
+    LOGNORMAL = 'LOGNORMAL'
+    
+    def __init__(self, density, mu = 0., bta = 1.):
         
-        self.distrib   = distrib
-        self.mean      = mean
-        self.precision = precision
+        assert density in [Prior.GAUSSIAN, Prior.LOGNORMAL], \
+               "Invalid density {}".format(density)
+        
+        self.density = density
+        self.mu      = mu
+        self.bta     = bta
+        
+    def pdf(self, x):
+        
+        if self.density == Prior.GAUSSIAN:
+            return np.sqrt(self.bta / (2. * np.pi)) * np.exp(-0.5 * np.power(x - self.mu, 2.))
+
+        elif self.density == Prior.LOGNORMAL:
+            return np.sqrt(self.bta / (2. * np.pi)) / x * np.exp(-0.5 * np.power(np.log(x / self.mu), 2.))
+
         
         
 LMStepOutput = collections.namedtuple('LMStepOutput',
@@ -33,7 +42,7 @@ LMStepOutput = collections.namedtuple('LMStepOutput',
 class LevenbergMarquardtReg: # frozen parameters
     
     def __init__(self, model_fn, lbda = .1, step_init = 1., min_displacement = 1E-5,
-                 max_lbda = 1., step_mult_down = 0.8,
+                 max_lbda = 1., step_mult_down = 0.8, step_mult_up = 1.2,
                  lbda_mult_up = 2., lbda_mult_down = 1.5,
                  check_every = 10, min_norm = 1E-5, max_iter = None):
         
@@ -43,6 +52,7 @@ class LevenbergMarquardtReg: # frozen parameters
         self.min_displacement = min_displacement
         self.max_lbda  = max_lbda
         self.step_mult_down = step_mult_down
+        self.step_mult_up   = step_mult_up 
         self.lbda_mult_up   = lbda_mult_up
         self.lbda_mult_down = lbda_mult_down
         self.check_every = check_every
@@ -52,6 +62,8 @@ class LevenbergMarquardtReg: # frozen parameters
         self.current_status = None
         
     def fit(self, X, y, theta_init, bounds = None, priors = None, weights = None):
+        
+        assert X.shape[0] == len(y), "Illegal input dimensions"
         
         self.nObs, self.nParams = X.shape
         
@@ -65,7 +77,7 @@ class LevenbergMarquardtReg: # frozen parameters
         self.total_displacement = 0.
         self.step = self.step_init
         
-        self.current_status = self.__get_current_status__(theta_init)
+        self.current_status = self.__get_optimization_status__(theta_init)
         print("Initial WSS: {}".format(self.current_status.WSS))
         
         nIter = 0
@@ -77,7 +89,7 @@ class LevenbergMarquardtReg: # frozen parameters
                 norm_theta = np.linalg.norm(self.theta)
                 if norm_theta == 0.:
                     raise Exception("Theta was set to 0")
-                perc_displacement = (self.total_displacement / self.check_every) / norm_theta
+                perc_displacement = self.total_displacement / norm_theta
                 print("Check after {nIter} iterations: % displacement = {perc_displacement}, norm_theta = {norm_theta}" \
                       .format(nIter = nIter, perc_displacement = perc_displacement, norm_theta = norm_theta))
                 
@@ -124,15 +136,15 @@ class LevenbergMarquardtReg: # frozen parameters
     def __add_priors__(self, A, b):
         
         A /= self.current_status.sigma2
-        for i in range(len(self.priors)):
-            pr = self.priors[i]
-            if pr.distrib == PDistr.GAUSSIAN:
-                A[i][i] += pr.precision
-                b[i]    -= pr.precision * (self.theta[i] - pr.mean)
-            if pr.distrib == PDistr.LOGNORMAL:
-                log_theta_over_mu = np.log(self.theta[i] / pr.mean)
-                A[i][i] += - (1. + (log_theta_over_mu - 1.) * pr.precision) / np.power(self.theta[i], 2.)
-                b[i]    -= pr.precision * (log_theta_over_mu + 1. / pr.precision) / self.theta[i]
+        for j in range(len(self.priors)):
+            pr = self.priors[j]
+            if pr.density == Prior.GAUSSIAN:
+                A[j][j] += pr.bta
+                b[j]    -= pr.bta * (self.theta[j] - pr.mu)
+            if pr.density == Prior.LOGNORMAL:
+                log_theta_over_mu = np.log(self.theta[j] / pr.mu)
+                A[j][j] += pr.bta / np.power(self.theta[j], 2.) #- (1. + (log_theta_over_mu - 1.) * pr.precision) / np.power(self.theta[i], 2.)
+                b[j]    -= pr.bta * (log_theta_over_mu + 1. / pr.bta) / self.theta[j]
 
         return A, b
 
@@ -141,7 +153,7 @@ class LevenbergMarquardtReg: # frozen parameters
         norm_desc_dir = np.linalg.norm(descent_direction)
         descent_direction = descent_direction / norm_desc_dir
         
-        self.status = self.__get_current_status__(self.theta)
+        self.status = self.__get_optimization_status__(self.theta)
 
         flg_theta_updated  = False
         while True:
@@ -149,24 +161,27 @@ class LevenbergMarquardtReg: # frozen parameters
             if self.lower is not None:
                 theta_new = np.clip(theta_new, self.lower, self.upper)
                 
-            new_status = self.__get_current_status__(theta_new)
+            new_status = self.__get_optimization_status__(theta_new)
             
             if new_status.Objective < self.current_status.Objective * (1. - 1E-5): # there has been a significant % decrease
                 self.current_status = new_status
                 self.theta = theta_new
                 self.total_displacement += self.step * norm_desc_dir
                 flg_theta_updated = True
+                self.step *= self.step_mult_up
             else:
+                if flg_theta_updated:
+                    break
                 self.step *= self.step_mult_down # try to decrease the step
             
-            if flg_theta_updated or self.step < self.min_displacement:
+            if self.step < self.min_displacement:
                 break
         
         if not flg_theta_updated: # update lambda
             self.lbda = min(self.max_lbda, self.lbda * self.lbda_mult_up)
             
                 
-    def __get_current_status__(self, theta):
+    def __get_optimization_status__(self, theta):
         
         yEst = self.model_fn(self.X, theta)
         err  = self.y - yEst
@@ -176,13 +191,12 @@ class LevenbergMarquardtReg: # frozen parameters
         Objective = WSS
         if self.priors is not None:
             Objective = 0.5 * self.nObs * np.log(sigma2) + 0.5 * WSS / sigma2
-            for i in range(len(self.priors)):
-                pr = self.priors[i]
-                mu, bta = pr.mean, pr.precision
-                if pr.distrib == PDistr.GAUSSIAN:
-                    Objective += 0.5 * bta * np.power(theta[i] - mu, 2.)
-                elif pr.distrib == PDistr.LOGNORMAL:
-                    Objective += np.log(theta[i]) + 0.5 * bta * np.power(theta[i] / mu, 2.)
+            for j in range(len(self.priors)):
+                pr = self.priors[j]
+                if pr.density == Prior.GAUSSIAN:
+                    Objective += 0.5 * pr.bta * np.power(theta[j] - pr.mu, 2.)
+                elif pr.density == Prior.LOGNORMAL:
+                    Objective += np.log(theta[j]) + 0.5 * pr.bta * np.power(np.log(theta[j] / pr.mu), 2.)
         
         return LMStepOutput(yEst      = yEst,
                             err       = err,
@@ -199,7 +213,6 @@ class LevenbergMarquardtReg: # frozen parameters
             
         return np.transpose(np.array(Jf))
 
-    
     def __improve_conditioning__(self, A):
         
         flg_matrix_changed = False
@@ -227,38 +240,3 @@ class LevenbergMarquardtReg: # frozen parameters
             upper[upper == None] = +1E+30
 
         return lower, upper
-    
-
-        
-    
-            
-'''
-df = pd.read_csv("data.csv")
-
-y = df['y'].values
-X = df[['x1', 'x2', 'x3']].values
-
-theta = np.array([5., 4., 6., 0.7, 46.12])
-
-def f(X, theta):
-    
-    X_transf = np.concatenate((np.ones((X.shape[0], 1)), X[:, :2]), axis = 1)
-    X_transf[:, 2] = X_transf[:, 2] ** 2.
-    
-    atan_arg = np.dot(X_transf, theta[:3]) + X[:, 2]
-    
-    return theta[4] * np.power(1. - 2. / np.pi * np.arctan(atan_arg), theta[3])
-        
-theta_init = np.array([4.5,  2.3,  5.1,  1., 60.])
-theta_opt  = np.array([ 5.,  4.,  6.,  0.7, 46.12])
-#priors = [Prior(PDistr.GAUSSIAN)] * len(theta_init)
-'''
-
-
-
-
-
-
-
-
-
