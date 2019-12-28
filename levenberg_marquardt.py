@@ -32,7 +32,7 @@ LMStepOutput = collections.namedtuple('LMStepOutput',
 
 class LevenbergMarquardtReg: # frozen parameters
     
-    def __init__(self, model_fn, lbda = .1, step_init = 1., min_displacement = 1E-3,
+    def __init__(self, model_fn, lbda = .1, step_init = 1., min_displacement = 1E-5,
                  max_lbda = 1., step_mult_down = 0.8,
                  lbda_mult_up = 2., lbda_mult_down = 1.5,
                  check_every = 10, min_norm = 1E-5, max_iter = None):
@@ -71,7 +71,7 @@ class LevenbergMarquardtReg: # frozen parameters
         nIter = 0
         while True:
             descent_direction = self.__find_descent_direction__()
-            flg_theta_updated = self.__move_to_new_theta__(descent_direction)
+            self.__move_to_new_theta__(descent_direction)
             nIter += 1
             if nIter % self.check_every == 0:
                 norm_theta = np.linalg.norm(self.theta)
@@ -80,7 +80,6 @@ class LevenbergMarquardtReg: # frozen parameters
                 perc_displacement = (self.total_displacement / self.check_every) / norm_theta
                 print("Check after {nIter} iterations: % displacement = {perc_displacement}, norm_theta = {norm_theta}" \
                       .format(nIter = nIter, perc_displacement = perc_displacement, norm_theta = norm_theta))
-                self.step = perc_displacement # FIXME da rivedere
                 
                 if perc_displacement < self.min_norm:
                     break
@@ -93,53 +92,57 @@ class LevenbergMarquardtReg: # frozen parameters
         return self.model_fn(X, self.theta)
 
     def __find_descent_direction__(self):
+        # descent direction solves a linear system Ax = b
         
         # Calculate descent direction from current theta
-        J  = self.Jf_theta(self.X, self.theta)
-        JT = np.transpose(J)
-        self.JTJ = np.dot(JT, np.dot(np.diag(self.weights), J))
-        self.constant_term = np.dot(JT, self.current_status.err) # = - gradient of the objective function
+        JTWT = self.Jf_theta(self.X, self.theta)
+        JTWT = np.dot(np.transpose(JTWT), np.sqrt(np.diag(self.weights)))
+        A = np.dot(JTWT, np.transpose(JTWT)) # JT*WT*W*J
+        b = np.dot(JTWT, self.current_status.err) # = - gradient of the objective function
         if self.priors is not None:
-            self.__add_priors__()
+            A, b = self.__add_priors__(A, b)
             
-        self.JTJ += self.lbda * np.diag(np.diag(self.JTJ)) # Marquardt
+        A += self.lbda * np.diag(np.diag(A)) # Marquardt
             
         success = False
-        for n_trial in [0, 1, 2]:
-            if np.linalg.cond(self.JTJ) < 1. / sys.float_info.epsilon:
-                descent_direction = np.linalg.solve(self.JTJ, self.constant_term)
+        while True:
+            if np.linalg.cond(A) < 1. / sys.float_info.epsilon:
+                descent_direction = np.linalg.solve(A, b)
                 success = True
                 break
-            self.__improve_JTJ_cond__(n_trial = n_trial)
+            if not self.__improve_conditioning__(A):
+                break
             
         if not success:
-            raise Exception("Could not invert JTJ matrix")
+            raise Exception("Could not calculate descent direction (singular matrix)")
             
-        if np.dot(self.constant_term, descent_direction) < 0.:
+        if np.dot(b, descent_direction) < -1E-10:
             raise Exception("Direction found is not a descent direction")
             
         return descent_direction
     
-    def __add_priors__(self):
+    def __add_priors__(self, A, b):
         
-        self.JTJ /= self.current_status.sigma2
+        A /= self.current_status.sigma2
         for i in range(len(self.priors)):
             pr = self.priors[i]
             if pr.distrib == PDistr.GAUSSIAN:
-                self.JTJ[i][i]        += pr.precision
-                self.constant_term[i] -= pr.precision * (self.theta[i] - pr.mean)
+                A[i][i] += pr.precision
+                b[i]    -= pr.precision * (self.theta[i] - pr.mean)
             if pr.distrib == PDistr.LOGNORMAL:
                 log_theta_over_mu = np.log(self.theta[i] / pr.mean)
-                self.JTJ[i][i]        += - (1. + (log_theta_over_mu - 1.) * pr.precision) / np.pow(self.theta[i], 2.)
-                self.constant_term[i] -= pr.precision * (log_theta_over_mu + 1. / pr.precision) / self.theta[i]
+                A[i][i] += - (1. + (log_theta_over_mu - 1.) * pr.precision) / np.power(self.theta[i], 2.)
+                b[i]    -= pr.precision * (log_theta_over_mu + 1. / pr.precision) / self.theta[i]
+
+        return A, b
 
     def __move_to_new_theta__(self, descent_direction):
             
         norm_desc_dir = np.linalg.norm(descent_direction)
+        descent_direction = descent_direction / norm_desc_dir
         
         self.status = self.__get_current_status__(self.theta)
 
-        flg_step_decreased = False
         flg_theta_updated  = False
         while True:
             theta_new = self.theta + self.step * descent_direction
@@ -148,22 +151,20 @@ class LevenbergMarquardtReg: # frozen parameters
                 
             new_status = self.__get_current_status__(theta_new)
             
-            if self.current_status.Objective - new_status.Objective > 1E-5 * self.current_status.Objective:
+            if new_status.Objective < self.current_status.Objective * (1. - 1E-5): # there has been a significant % decrease
                 self.current_status = new_status
                 self.theta = theta_new
                 self.total_displacement += self.step * norm_desc_dir
                 flg_theta_updated = True
             else:
-                self.step *= self.step_mult_down
-                flg_step_decreased = True
+                self.step *= self.step_mult_down # try to decrease the step
             
-            if self.step * norm_desc_dir < self.min_displacement:
+            if flg_theta_updated or self.step < self.min_displacement:
                 break
         
-        if flg_step_decreased: # update lambda
+        if not flg_theta_updated: # update lambda
             self.lbda = min(self.max_lbda, self.lbda * self.lbda_mult_up)
             
-        return flg_theta_updated
                 
     def __get_current_status__(self, theta):
         
@@ -199,21 +200,21 @@ class LevenbergMarquardtReg: # frozen parameters
         return np.transpose(np.array(Jf))
 
     
-    def __improve_JTJ_cond__(self, n_trial = 1):
+    def __improve_conditioning__(self, A):
         
-        if n_trial == 1:
-            # se JTJ non è invertibile perché ha una o più righe nulle, si mette un 1
-            # sulla diagonale per ogni riga nulla (ci si avvicina alla direzione del gradiente)
-            
-            zero_rows = np.where(np.max(np.abs(self.JTJ), axis = 1) < 1E-5)[0]
-            for i in zero_rows:
-                self.JTJ[i][i] = 1.
+        flg_matrix_changed = False
+        if max(abs(np.diag(A)) - 1.) > 1E-5:
+            # Are there any zero rows in A? If so, put a 1. on their diagonal for those rows only.
+            zero_rows = np.where(np.max(np.abs(A), axis = 1) < 1E-5)[0]
+            if len(zero_rows) > 0:
+                A.put([(A.shape[1] + 1) * i for i in zero_rows], 1.)
+            else:
+                # Last attempt: set all elements on the diagonal = 1.
+                np.fill_diagonal(A, 1.)
                 
-        elif n_trial == 2:
-            # mette 1 sulla diagonale della matrice, usata come estrema ratio
-            # se matrice non è invertibile
-            for i in range(len(self.JTJ)):
-                self.JTJ[i][i] = 1.
+            flg_matrix_changed = True
+
+        return flg_matrix_changed
                 
     def __set_bounds__(self, bounds):
         
