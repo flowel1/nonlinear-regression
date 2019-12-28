@@ -74,7 +74,7 @@ Reasoning in Bayesian terms, this time we estimate <ins>&theta;</ins> via **maxi
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=p(\underline{\theta}&space;|&space;X,&space;\underline{y})&space;=&space;\frac{p(\underline{y}&space;|&space;X,&space;\underline{\theta})&space;\cdot&space;p(\underline{\theta})}{p(\underline{y}&space;|&space;X)}" target="_blank"><img src="https://latex.codecogs.com/svg.latex?p(\underline{\theta}&space;|&space;X,&space;\underline{y})&space;=&space;\frac{p(\underline{y}&space;|&space;X,&space;\underline{\theta})&space;\cdot&space;p(\underline{\theta})}{p(\underline{y}&space;|&space;X)}" title="p(\underline{\theta} | X, \underline{y}) = \frac{p(\underline{y} | X, \underline{\theta}) \cdot p(\underline{\theta})}{p(\underline{y} | X)}" /></a>
 
-(using the fact that <a href="https://www.codecogs.com/eqnedit.php?latex=p(\underline{\theta}&space;|&space;X)&space;=&space;p(\underline{\theta})" target="_blank"><img src="https://latex.codecogs.com/svg.latex?p(\underline{\theta}&space;|&space;X)&space;=&space;p(\underline{\theta})" title="p(\underline{\theta} | X) = p(\underline{\theta})" /></a>)).
+(using the fact that <a href="https://www.codecogs.com/eqnedit.php?latex=p(\underline{\theta}&space;|&space;X)&space;=&space;p(\underline{\theta})" target="_blank"><img src="https://latex.codecogs.com/svg.latex?p(\underline{\theta}&space;|&space;X)&space;=&space;p(\underline{\theta})" title="p(\underline{\theta} | X) = p(\underline{\theta})" /></a>).
 
 Keeping the same notations as before, we have
 
