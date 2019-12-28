@@ -23,6 +23,10 @@ we see that maximizing the log-likelihood is equivalent to minimizing the follow
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=\text{Obj}(\underline{\theta})&space;=&space;\left&space;\|&space;W&space;\cdot&space;\left(&space;\underline{y}&space;-&space;f(X,&space;\underline{\theta})&space;\right)&space;\right&space;\|&space;^&space;2" target="_blank"><img src="https://latex.codecogs.com/svg.latex?\text{Obj}(\underline{\theta})&space;=&space;\left&space;\|&space;W&space;\cdot&space;\left(&space;\underline{y}&space;-&space;f(X,&space;\underline{\theta})&space;\right)&space;\right&space;\|&space;^&space;2" title="\text{Obj}(\underline{\theta}) = \left \| W \cdot \left( \underline{y} - f(X, \underline{\theta}) \right) \right \| ^ 2" /></a>
 
+Moreover, the maximum likelihood estimate for &sigma; is
+
+<a href="https://www.codecogs.com/eqnedit.php?latex=\hat{\sigma}^2&space;=&space;\frac{1}{N}&space;\sum_{i=1}^N&space;w_i&space;(y_i&space;-f(\underline{x_i},&space;\underline{\theta}))^2" target="_blank"><img src="https://latex.codecogs.com/svg.latex?\hat{\sigma}^2&space;=&space;\frac{1}{N}&space;\sum_{i=1}^N&space;w_i&space;(y_i&space;-f(\underline{x_i},&space;\underline{\theta}))^2" title="\hat{\sigma}^2 = \frac{1}{N} \sum_{i=1}^N w_i (y_i -f(\underline{x_i}, \underline{\theta}))^2" /></a>.
+
 ## The Levenberg-Marquardt algorithm
 
 The Levenberg-Marquardt algorithm calculates the minimum of Obj in an iterative way calculating a series of local quadratic approximations.
@@ -98,6 +102,4 @@ where
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=r_j&space;=&space;\left\{\begin{matrix}&space;-\beta_j^2&space;(\theta_j&space;-&space;\mu_j)&&space;&&space;\text{if&space;}&space;p_j(\theta_j)&space;=&space;N(\mu_j,&space;\frac{1}{\beta_j^2})&space;\\&space;\newline&space;\\&space;-\frac{1}{\theta_j}&space;-&space;\frac{\beta_j^2}{\theta_j}&space;\log&space;\frac{\theta_j}{\mu_j}&space;&&space;&&space;\text{if&space;}&space;p_j(\theta_j)&space;=&space;\text{logN}(\log\mu_j,&space;\frac{1}{\beta_j^2})&space;\end{matrix}\right." target="_blank"><img src="https://latex.codecogs.com/svg.latex?r_j&space;=&space;\left\{\begin{matrix}&space;-\beta_j^2&space;(\theta_j&space;-&space;\mu_j)&&space;&&space;\text{if&space;}&space;p_j(\theta_j)&space;=&space;N(\mu_j,&space;\frac{1}{\beta_j^2})&space;\\&space;\newline&space;\\&space;-\frac{1}{\theta_j}&space;-&space;\frac{\beta_j^2}{\theta_j}&space;\log&space;\frac{\theta_j}{\mu_j}&space;&&space;&&space;\text{if&space;}&space;p_j(\theta_j)&space;=&space;\text{logN}(\log\mu_j,&space;\frac{1}{\beta_j^2})&space;\end{matrix}\right." title="r_j = \left\{\begin{matrix} -\beta_j^2 (\theta_j - \mu_j)& & \text{if } p_j(\theta_j) = N(\mu_j, \frac{1}{\beta_j^2}) \\ \newline \\ -\frac{1}{\theta_j} - \frac{\beta_j^2}{\theta_j} \log \frac{\theta_j}{\mu_j} & & \text{if } p_j(\theta_j) = \text{logN}(\log\mu_j, \frac{1}{\beta_j^2}) \end{matrix}\right." /></a>
 
-and &sigma; is replaced by its maximum likelihood estimate
-
-<a href="https://www.codecogs.com/eqnedit.php?latex=\hat{\sigma}^2&space;=&space;\frac{1}{N}&space;\sum_{i=1}^N&space;w_i&space;(y_i&space;-f(\underline{x_i},&space;\underline{\theta}))^2" target="_blank"><img src="https://latex.codecogs.com/svg.latex?\hat{\sigma}^2&space;=&space;\frac{1}{N}&space;\sum_{i=1}^N&space;w_i&space;(y_i&space;-f(\underline{x_i},&space;\underline{\theta}))^2" title="\hat{\sigma}^2 = \frac{1}{N} \sum_{i=1}^N w_i (y_i -f(\underline{x_i}, \underline{\theta}))^2" /></a>.
+and &sigma; is replaced by its maximum likelihood estimate (see above).
