@@ -1,7 +1,7 @@
 # Levenberg-Marquardt algorithm for nonlinear regression
 
 ## Nonlinear regression: generic problem statement
-Let us consider a regression problem where a scalar target variable _y_ must be predicted based on a vector of observables <a href="https://www.codecogs.com/eqnedit.php?latex=\underline{x}&space;\in&space;\mathbb{R}^n" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\underline{x}&space;\in&space;\mathbb{R}^n" title="\underline{x} \in \mathbb{R}^n" /></a>.
+Let us consider a regression problem where a scalar target variable _y_ must be predicted based on a vector of observables <a href="https://www.codecogs.com/eqnedit.php?latex=\underline{x}&space;\in&space;\mathbb{R}^n" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\underline{x}&space;\in&space;\mathbb{R}^n" title="\underline{x} \in \mathbb{R}^n"/></a>.
 
 We assume that the dynamics are **nonlinear** and, specifically, that
 
